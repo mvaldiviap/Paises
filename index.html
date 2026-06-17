@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Buscador de Países</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0 }
+
+  body {
+    font-family: system-ui, sans-serif;
+    background: #0f1117;
+    color: #e2e8f0;
+    min-height: 100vh;
+    padding: 32px 16px;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 24px;
+    margin-bottom: 8px;
+    color: #63b3ed;
+  }
+
+  .subtitle {
+    text-align: center;
+    font-size: 13px;
+    color: #718096;
+    margin-bottom: 28px;
+  }
+
+  /* ── BUSCADOR ── */
+  .search-wrap {
+    max-width: 480px;
+    margin: 0 auto 32px;
+    position: relative;
+  }
+
+  input {
+    width: 100%;
+    padding: 12px 48px 12px 16px;
+    border-radius: 10px;
+    border: 1px solid #2d3748;
+    background: #1a202c;
+    color: #e2e8f0;
+    font-size: 15px;
+    outline: none;
+    transition: border-color .2s;
+  }
+
+  input:focus { border-color: #63b3ed }
+
+  .search-icon {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 18px;
+    pointer-events: none;
+  }
+
+  /* ── GRILLA ── */
+  #results {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 16px;
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+
+  /* ── TARJETA ── */
+  .card {
+    background: #1a202c;
+    border: 1px solid #2d3748;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: transform .15s, border-color .15s;
+  }
+
+  .card:hover {
+    transform: translateY(-3px);
+    border-color: #63b3ed;
+  }
+
+  .card img {
+    width: 100%;
+    height: 130px;
+    object-fit: cover;
+    display: block;
+  }
+
+  .card-body {
+    padding: 14px 16px;
+  }
+
+  .card-name {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: #fff;
+  }
+
+  .card-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #718096;
+    margin-bottom: 5px;
+  }
+
+  .card-row span:last-child { color: #a0aec0 }
+
+  /* ── ESTADOS ── */
+  .msg {
+    text-align: center;
+    color: #718096;
+    font-size: 14px;
+    padding: 40px;
+    grid-column: 1/-1;
+  }
+
+  .spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #2d3748;
+    border-top-color: #63b3ed;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    margin: 40px auto;
+    grid-column: 1/-1;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg) } }
+</style>
+</head>
+<body>
+
+<h1>🌍 Buscador de Países</h1>
+<p class="subtitle">Datos en tiempo real desde RestCountries API</p>
+
+<div class="search-wrap">
+  <input
+    type="text"
+    id="search"
+    placeholder="Escribe un país... ej: Chile, Japan, France"
+    autocomplete="off"
+  >
+  <span class="search-icon">🔍</span>
+</div>
+
+<div id="results">
+  <p class="msg">Escribe el nombre de un país para comenzar</p>
+</div>
+
+<script>
+
+  // ─────────────────────────────────────────────────
+  // LECCIÓN 1: async / await + fetch
+  // Llamamos a la API y esperamos la respuesta
+  // ─────────────────────────────────────────────────
+  async function buscarPaises(query) {
+
+    // Mostramos spinner mientras carga
+    mostrarSpinner()
+
+    try {
+
+      // fetch devuelve una Promise — await espera el resultado
+      const response = await fetch(
+        `https://restcountries.com/v3.1/name/${query}`
+      )
+
+      // Si la API responde con error (404, 500, etc.) lo manejamos
+      if (!response.ok) {
+        if (response.status === 404) {
+          mostrarMensaje('No se encontraron países con ese nombre')
+        } else {
+          throw new Error(`Error HTTP: ${response.status}`)
+        }
+        return
+      }
+
+      // Convertimos la respuesta a JSON — también es async
+      const paises = await response.json()
+
+      // paises es un array — lo procesamos con renderPaises()
+      renderPaises(paises)
+
+    } catch (err) {
+      mostrarMensaje(`Error al consultar la API: ${err.message}`)
+      console.error(err)
+    }
+  }
+
+
+  // ─────────────────────────────────────────────────
+  // LECCIÓN 2: DESESTRUCTURACIÓN
+  // En vez de pais.name.common, pais.capital[0], etc.
+  // extraemos las propiedades directamente
+  // ─────────────────────────────────────────────────
+  function renderPaises(paises) {
+
+    // .map() transforma cada objeto país en una tarjeta HTML
+    const tarjetas = paises.map(pais => {
+
+      // DESESTRUCTURACIÓN del objeto país
+      // Extraemos solo las propiedades que nos interesan
+      const {
+        name,        // { common: "Chile", official: "Republic of Chile" }
+        capital,     // ["Santiago"]
+        population,  // 19116201
+        region,      // "Americas"
+        flags        // { svg: "...", png: "..." }
+      } = pais
+
+      // Desestructuración anidada — extraemos common de name
+      const { common: nombrePais } = name
+
+      // capital es un array — puede venir vacío en algunos países
+      const capitalNombre = capital?.[0] ?? 'Sin capital'
+
+      // Formateamos población con separador de miles
+      const poblacionFormateada = population.toLocaleString('es-CL')
+
+      // Retornamos el HTML de la tarjeta
+      return `
+        <div class="card">
+          <img src="${flags.svg}" alt="Bandera de ${nombrePais}" loading="lazy">
+          <div class="card-body">
+            <p class="card-name">${nombrePais}</p>
+            <div class="card-row">
+              <span>🏛 Capital</span>
+              <span>${capitalNombre}</span>
+            </div>
+            <div class="card-row">
+              <span>👥 Población</span>
+              <span>${poblacionFormateada}</span>
+            </div>
+            <div class="card-row">
+              <span>🌎 Región</span>
+              <span>${region}</span>
+            </div>
+          </div>
+        </div>
+      `
+    })
+
+    // .join('') une el array de strings en un solo string HTML
+    document.getElementById('results').innerHTML = tarjetas.join('')
+  }
+
+
+  // ─────────────────────────────────────────────────
+  // LECCIÓN 3: ARRAY METHODS
+  // Ordenamos los resultados por población (mayor a menor)
+  // usando .sort() antes de pasarlos a renderPaises
+  // ─────────────────────────────────────────────────
+  function ordenarYRenderizar(paises) {
+    const ordenados = [...paises].sort((a, b) => b.population - a.population)
+    renderPaises(ordenados)
+  }
+
+
+  // ─────────────────────────────────────────────────
+  // HELPERS — mostrar estados de UI
+  // ─────────────────────────────────────────────────
+  function mostrarSpinner() {
+    document.getElementById('results').innerHTML = '<div class="spinner"></div>'
+  }
+
+  function mostrarMensaje(msg) {
+    document.getElementById('results').innerHTML = `<p class="msg">${msg}</p>`
+  }
+
+
+  // ─────────────────────────────────────────────────
+  // EVENTO — escucha lo que escribe el usuario
+  // Espera 500ms después de que para de escribir (debounce)
+  // para no llamar la API con cada letra
+  // ─────────────────────────────────────────────────
+  let timer
+
+  document.getElementById('search').addEventListener('input', (e) => {
+    const query = e.target.value.trim()
+
+    // Limpiamos el timer anterior
+    clearTimeout(timer)
+
+    if (query.length < 2) {
+      mostrarMensaje('Escribe al menos 2 caracteres')
+      return
+    }
+
+    // Esperamos 500ms antes de llamar la API
+    timer = setTimeout(() => {
+      buscarPaises(query)
+    }, 500)
+  })
+
+</script>
+</body>
+</html>
